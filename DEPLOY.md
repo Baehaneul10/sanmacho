@@ -1,11 +1,30 @@
 # 배포 가이드 (간단 요약)
 
-정적 사이트(프론트)와 API(Node + MariaDB)는 **역할이 다릅니다**.
+정적 사이트(프론트)와 API(Node + DB)는 **역할이 다릅니다**. DB는 **Supabase(Postgres)** 를 쓰면 서버에서 설치할 필요가 없습니다.
 
 | 무엇 | GitHub Pages | Render / Railway / Cloud Run |
 |------|----------------|------------------------------|
 | Vue `dist` | ✅ 무료로 적합 | 가능하나 Pages가 더 단순 |
-| Node API + DB | ❌ 불가 | ✅ 여기에 올리기 |
+| Node API + DB | ❌ 불가 | ✅ API만 여기에, DB는 Supabase |
+
+---
+
+## Supabase 연동 (비전공자용 순서)
+
+1. **Supabase**에서 프로젝트를 만듭니다.
+2. 왼쪽 **Project Settings**(톱니바퀴) → **Database** 로 갑니다.
+3. **Connection string** / **URI** 에서 `postgresql://postgres:[YOUR-PASSWORD]@db....` 형태를 복사합니다.
+4. `[YOUR-PASSWORD]` 를 **실제 DB 비밀번호**로 바꿉니다. (프로젝트 만들 때 정한 비밀번호; 잊었으면 Database 메뉴에서 재설정)
+5. PC에서 `server` 폴더에 **`.env`** 파일을 만들고 한 줄 넣습니다:  
+   `DATABASE_URL=postgresql://postgres:비밀번호@db.xxx.supabase.co:5432/postgres`  
+   이 파일은 **Git에 올리지 마세요** (이미 `.gitignore`에 `.env`가 있으면 안 올라갑니다).
+6. (선택) Supabase **SQL Editor**에서 `server/sql/schema.postgres.sql` 내용을 붙여 실행해 테이블을 미리 만들 수 있습니다. **안 해도 됩니다** — API 서버를 처음 띄울 때 자동으로 같은 테이블을 만들도록 되어 있습니다.
+7. 터미널에서:
+   - `cd server` → `npm install` → `npm run dev`  
+   - 프로젝트 루트에서 `npm run dev` (프론트) — Vite가 `/api`를 API로 넘깁니다.
+8. 배포할 때는 **Render** 등에 API를 올리고, 그 서비스의 Environment에 **`DATABASE_URL`** 을 Supabase에서 복사한 값으로 넣습니다. 프론트 빌드에는 **`VITE_API_BASE`** 에 배포된 API 주소를 넣습니다.
+
+**비공개 GitHub 저장소**는 무료로 **GitHub Pages**가 막힐 수 있습니다. 그때는 저장소를 **공개**로 바꾸거나, `dist` 폴더를 **Netlify / Cloudflare Pages** 에 올리는 방법을 쓰면 됩니다.
 
 ---
 
@@ -33,10 +52,8 @@
 2. **Root Directory** 를 `server` 로 지정 (또는 Docker 사용 시 아래 참고).
 3. **Build Command**: `npm ci && npm run build`  
    **Start Command**: `node dist/index.js`
-4. **New → PostgreSQL** 이 아니라 **MySQL** 이 있으면 그걸 쓰고, 없으면 **Docker로 MariaDB** 를 다른 서비스에 두거나, Render의 **Private Service** 대신 외부 DB(Aiven 무료체험 등)를 연결합니다.  
-   **가장 단순한 데모**는 같은 Render 계정에서 **MySQL 인스턴스**를 만들고 `DB_HOST` 등을 Render가 주는 값으로 채웁니다 (`mysql2`는 MySQL/MariaDB 프로토콜 호환).
-5. Environment 에 `server/.env.example` 항목을 채웁니다.  
-   `HOST=0.0.0.0`, `PORT` 는 Render가 주는 `PORT`에 맞추세요 (보통 `10000` 대역 — Render가 자동 주입하는 `PORT` 사용 권장).
+4. Environment 에 **`DATABASE_URL`** (Supabase Postgres URI) 과 `CORS_ORIGIN` 등을 넣습니다.  
+   `HOST=0.0.0.0`, `PORT` 는 Render가 주는 `PORT`에 맞추세요.
 
 **Docker로 API만 올리기 (Render)**  
 
@@ -55,7 +72,7 @@ cd server
 gcloud run deploy portfolio-api --source . --region asia-northeast3 --allow-unauthenticated
 ```
 
-- DB는 **Cloud SQL for MySQL** 을 만들고 연결하거나, 테스트용으로 위와 같이 외부 호스트 가능한 MariaDB에 두면 됩니다.
+- DB는 **Supabase** 또는 **Cloud SQL for PostgreSQL** 등에 두고 `DATABASE_URL` 로 연결하면 됩니다.
 - Cloud Run 서비스 URL을 복사해 GitHub Secret `VITE_API_BASE` 에 넣습니다.
 
 ---
@@ -64,18 +81,15 @@ gcloud run deploy portfolio-api --source . --region asia-northeast3 --allow-unau
 
 ```bash
 docker build -t portfolio-api -f server/Dockerfile server
-docker run --rm -p 3000:3000 -e DB_HOST=host.docker.internal -e DB_USER=... -e DB_PASSWORD=... -e DB_NAME=portfolio portfolio-api
+docker run --rm -p 3000:3000 -e DATABASE_URL="postgresql://..." portfolio-api
 ```
 
-(`host.docker.internal` 은 Docker Desktop에서 호스트의 MariaDB로 붙을 때 예시입니다.)
+---
+
+## 5) 로컬 DB만 쓰고 싶을 때 (선택)
+
+- 루트의 **`docker-compose.yml`** 은 로컬 **MariaDB** 예시입니다. 현재 API는 **Postgres** 이므로, 로컬에서 Postgres를 쓰거나 Supabase만 쓰는 편이 맞습니다.
 
 ---
 
-## 5) MariaDB를 클라우드에서 가장 단순히
-
-- 이미 있는 **`docker-compose.yml`** 로 VPS(Oracle Cloud 무료 VM, Lightsail 등)에서 `docker compose up -d` 만 해도 됩니다.
-- 또는 managed **PlanetScale / Aiven / Railway MySQL** 등에서 호스트·유저·비번만 API 환경 변수에 넣으면 됩니다.
-
----
-
-요약: **GitHub Pages = 프론트**, **Render·Cloud Run·VPS = API+DB** 조합이 가장 이해하기 쉽습니다.
+요약: **GitHub Pages = 프론트**, **Supabase = DB**, **Render·Cloud Run = API** 조합이 단순합니다.

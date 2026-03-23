@@ -1,3 +1,6 @@
+-- 레거시: MariaDB / MySQL (현재 API는 PostgreSQL + DATABASE_URL 사용)
+-- Postgres(Supabase)는 server/sql/schema.postgres.sql 참고
+--
 -- MariaDB / MySQL — 수동 설치 시
 CREATE DATABASE IF NOT EXISTS portfolio CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE portfolio;
