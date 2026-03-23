@@ -1,0 +1,22 @@
+# 로컬/실서버에서 MariaDB만 컨테이너로 띄울 때 예시
+# 사용: docker compose up -d
+# 이후 server/.env 에 DB_HOST=127.0.0.1, DB_USER/DB_PASSWORD 를 아래와 맞춤
+
+services:
+  mariadb:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-changeme_root}
+      MYSQL_DATABASE: portfolio
+      MYSQL_USER: portfolio
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-changeme_app}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - portfolio_mariadb:/var/lib/mysql
+      - ./server/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+volumes:
+  portfolio_mariadb:
